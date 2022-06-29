@@ -217,6 +217,51 @@
               "fieldFlag": "server.http-tls-ca-path",
               "fieldType": "string",
               "fieldCategory": "advanced"
+            },
+            {
+              "kind": "field",
+              "name": "cipher_suites",
+              "required": false,
+              "desc": "",
+              "fieldValue": null,
+              "fieldDefaultValue": [],
+              "fieldType": "list of int"
+            },
+            {
+              "kind": "field",
+              "name": "curve_preferences",
+              "required": false,
+              "desc": "",
+              "fieldValue": null,
+              "fieldDefaultValue": [],
+              "fieldType": "list of int"
+            },
+            {
+              "kind": "field",
+              "name": "min_version",
+              "required": false,
+              "desc": "",
+              "fieldValue": null,
+              "fieldDefaultValue": 0,
+              "fieldType": "int"
+            },
+            {
+              "kind": "field",
+              "name": "max_version",
+              "required": false,
+              "desc": "",
+              "fieldValue": null,
+              "fieldDefaultValue": 0,
+              "fieldType": "int"
+            },
+            {
+              "kind": "field",
+              "name": "prefer_server_cipher_suites",
+              "required": false,
+              "desc": "",
+              "fieldValue": null,
+              "fieldDefaultValue": false,
+              "fieldType": "boolean"
             }
           ],
           "fieldValue": null,
@@ -271,6 +316,51 @@
               "fieldFlag": "server.grpc-tls-ca-path",
               "fieldType": "string",
               "fieldCategory": "advanced"
+            },
+            {
+              "kind": "field",
+              "name": "cipher_suites",
+              "required": false,
+              "desc": "",
+              "fieldValue": null,
+              "fieldDefaultValue": [],
+              "fieldType": "list of int"
+            },
+            {
+              "kind": "field",
+              "name": "curve_preferences",
+              "required": false,
+              "desc": "",
+              "fieldValue": null,
+              "fieldDefaultValue": [],
+              "fieldType": "list of int"
+            },
+            {
+              "kind": "field",
+              "name": "min_version",
+              "required": false,
+              "desc": "",
+              "fieldValue": null,
+              "fieldDefaultValue": 0,
+              "fieldType": "int"
+            },
+            {
+              "kind": "field",
+              "name": "max_version",
+              "required": false,
+              "desc": "",
+              "fieldValue": null,
+              "fieldDefaultValue": 0,
+              "fieldType": "int"
+            },
+            {
+              "kind": "field",
+              "name": "prefer_server_cipher_suites",
+              "required": false,
+              "desc": "",
+              "fieldValue": null,
+              "fieldDefaultValue": false,
+              "fieldType": "boolean"
             }
           ],
           "fieldValue": null,
@@ -496,6 +586,16 @@
         },
         {
           "kind": "field",
+          "name": "log_request_at_info_level_enabled",
+          "required": false,
+          "desc": "Optionally log requests at info level instead of debug level.",
+          "fieldValue": null,
+          "fieldDefaultValue": false,
+          "fieldFlag": "server.log-request-at-info-level-enabled",
+          "fieldType": "boolean"
+        },
+        {
+          "kind": "field",
           "name": "http_path_prefix",
           "required": false,
           "desc": "Base path to serve all API routes from (e.g. /v1/)",
@@ -692,6 +792,17 @@
                       "fieldDefaultValue": 1,
                       "fieldFlag": "distributor.ha-tracker.consul.watch-burst-size",
                       "fieldType": "int",
+                      "fieldCategory": "advanced"
+                    },
+                    {
+                      "kind": "field",
+                      "name": "cas_retry_delay",
+                      "required": false,
+                      "desc": "Maximum duration to wait before retrying a Compare And Swap (CAS) operation.",
+                      "fieldValue": null,
+                      "fieldDefaultValue": 1000000000,
+                      "fieldFlag": "distributor.ha-tracker.consul.cas-retry-delay",
+                      "fieldType": "duration",
                       "fieldCategory": "advanced"
                     }
                   ],
@@ -1012,6 +1123,17 @@
                       "fieldDefaultValue": 1,
                       "fieldFlag": "distributor.ring.consul.watch-burst-size",
                       "fieldType": "int",
+                      "fieldCategory": "advanced"
+                    },
+                    {
+                      "kind": "field",
+                      "name": "cas_retry_delay",
+                      "required": false,
+                      "desc": "Maximum duration to wait before retrying a Compare And Swap (CAS) operation.",
+                      "fieldValue": null,
+                      "fieldDefaultValue": 1000000000,
+                      "fieldFlag": "distributor.ring.consul.cas-retry-delay",
+                      "fieldType": "duration",
                       "fieldCategory": "advanced"
                     }
                   ],
@@ -1859,6 +1981,17 @@
                       "fieldDefaultValue": 1,
                       "fieldFlag": "ingester.ring.consul.watch-burst-size",
                       "fieldType": "int",
+                      "fieldCategory": "advanced"
+                    },
+                    {
+                      "kind": "field",
+                      "name": "cas_retry_delay",
+                      "required": false,
+                      "desc": "Maximum duration to wait before retrying a Compare And Swap (CAS) operation.",
+                      "fieldValue": null,
+                      "fieldDefaultValue": 1000000000,
+                      "fieldFlag": "ingester.ring.consul.cas-retry-delay",
+                      "fieldType": "duration",
                       "fieldCategory": "advanced"
                     }
                   ],
@@ -5749,6 +5882,17 @@
                       "fieldFlag": "compactor.ring.consul.watch-burst-size",
                       "fieldType": "int",
                       "fieldCategory": "advanced"
+                    },
+                    {
+                      "kind": "field",
+                      "name": "cas_retry_delay",
+                      "required": false,
+                      "desc": "Maximum duration to wait before retrying a Compare And Swap (CAS) operation.",
+                      "fieldValue": null,
+                      "fieldDefaultValue": 1000000000,
+                      "fieldFlag": "compactor.ring.consul.cas-retry-delay",
+                      "fieldType": "duration",
+                      "fieldCategory": "advanced"
                     }
                   ],
                   "fieldValue": null,
@@ -6165,6 +6309,17 @@
                       "fieldDefaultValue": 1,
                       "fieldFlag": "store-gateway.sharding-ring.consul.watch-burst-size",
                       "fieldType": "int",
+                      "fieldCategory": "advanced"
+                    },
+                    {
+                      "kind": "field",
+                      "name": "cas_retry_delay",
+                      "required": false,
+                      "desc": "Maximum duration to wait before retrying a Compare And Swap (CAS) operation.",
+                      "fieldValue": null,
+                      "fieldDefaultValue": 1000000000,
+                      "fieldFlag": "store-gateway.sharding-ring.consul.cas-retry-delay",
+                      "fieldType": "duration",
                       "fieldCategory": "advanced"
                     }
                   ],
@@ -7061,6 +7216,17 @@
                       "fieldDefaultValue": 1,
                       "fieldFlag": "ruler.ring.consul.watch-burst-size",
                       "fieldType": "int",
+                      "fieldCategory": "advanced"
+                    },
+                    {
+                      "kind": "field",
+                      "name": "cas_retry_delay",
+                      "required": false,
+                      "desc": "Maximum duration to wait before retrying a Compare And Swap (CAS) operation.",
+                      "fieldValue": null,
+                      "fieldDefaultValue": 1000000000,
+                      "fieldFlag": "ruler.ring.consul.cas-retry-delay",
+                      "fieldType": "duration",
                       "fieldCategory": "advanced"
                     }
                   ],
@@ -8374,6 +8540,17 @@
                       "fieldDefaultValue": 1,
                       "fieldFlag": "alertmanager.sharding-ring.consul.watch-burst-size",
                       "fieldType": "int",
+                      "fieldCategory": "advanced"
+                    },
+                    {
+                      "kind": "field",
+                      "name": "cas_retry_delay",
+                      "required": false,
+                      "desc": "Maximum duration to wait before retrying a Compare And Swap (CAS) operation.",
+                      "fieldValue": null,
+                      "fieldDefaultValue": 1000000000,
+                      "fieldFlag": "alertmanager.sharding-ring.consul.cas-retry-delay",
+                      "fieldType": "duration",
                       "fieldCategory": "advanced"
                     }
                   ],

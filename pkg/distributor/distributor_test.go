@@ -3566,7 +3566,7 @@ outer:
 }
 
 func setMockForwarder(distributor *Distributor, ingest bool) *mockForwarder {
-	forwarder := &mockForwarder{ingest: ingest}
+	forwarder := newMockForwarder(ingest, nil)
 	distributor.forwarder = forwarder
 	return forwarder
 }
@@ -3577,6 +3577,13 @@ type mockForwarder struct {
 
 	// Callback to run in place of the actual forwarding request.
 	sendCallback func()
+}
+
+func newMockForwarder(ingest bool, sendCallback func()) *mockForwarder {
+	return &mockForwarder{
+		ingest:       ingest,
+		sendCallback: sendCallback,
+	}
 }
 
 func (m *mockForwarder) NewRequest(ctx context.Context, tenant string, _ validation.ForwardingRules) forwarding.Request {
@@ -3591,11 +3598,11 @@ func (m *mockForwardingRequest) Add(sample mimirpb.PreallocTimeseries) bool {
 	return m.forwarder.ingest
 }
 
-func (m *mockForwardingRequest) Send(ctx context.Context) <-chan error {
-	errCh := make(chan error)
+func (m *mockForwardingRequest) Send(ctx context.Context) *forwarding.Promise {
+	promise := forwarding.NewPromise(time.Second, true)
 
 	go func() {
-		defer close(errCh)
+		defer promise.Done()
 
 		if m.forwarder.sendCallback != nil {
 			m.forwarder.sendCallback()
@@ -3604,7 +3611,7 @@ func (m *mockForwardingRequest) Send(ctx context.Context) <-chan error {
 		m.forwarder.sendCount.Inc()
 	}()
 
-	return errCh
+	return promise
 }
 
 func TestDistributorValidation(t *testing.T) {

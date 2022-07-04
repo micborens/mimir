@@ -62,8 +62,8 @@ func TestForwardingSamplesSuccessfully(t *testing.T) {
 	ingesterPush = forwardingReq.Add(newSample(t, now, 4, "__name__", "metric2", "some_label", "bar"))
 	require.True(t, ingesterPush)
 
-	errCh := forwardingReq.Send(context.Background())
-	require.NoError(t, <-errCh)
+	promise := forwardingReq.Send(context.Background())
+	require.NoError(t, promise.Error())
 
 	for _, req := range append(*reqs1, *reqs2...) {
 		require.Equal(t, req.Header.Get("Content-Encoding"), "snappy")
@@ -199,12 +199,12 @@ func TestForwardingSamplesWithDifferentErrorsWithPropagation(t *testing.T) {
 				forwardingReq.Add(newSample(t, now, 1, "__name__", metric))
 			}
 
-			errCh := forwardingReq.Send(context.Background())
+			promise := forwardingReq.Send(context.Background())
 			switch tc.expectedError {
 			case errNone:
-				require.Nil(t, <-errCh)
+				require.Nil(t, promise.Error())
 			case errRecoverable, errNonRecoverable:
-				err := <-errCh
+				err := promise.Error()
 				require.NotNil(t, err)
 				resp, ok := httpgrpc.HTTPResponseFromError(err)
 				require.True(t, ok)
@@ -335,8 +335,8 @@ func BenchmarkRemoteWriteForwarding(b *testing.B) {
 			req.Add(sample)
 		}
 
-		errCh := req.Send(ctx)
-		require.Nil(b, <-errCh)
+		promise := req.Send(ctx)
+		require.Nil(b, promise.Error())
 	}
 }
 

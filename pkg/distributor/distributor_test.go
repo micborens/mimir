@@ -2452,10 +2452,31 @@ func TestDistributor_ForwarderWithSlowTargets(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := user.InjectOrgID(context.Background(), "user")
 
-			cleanedUp := atomic.NewBool(false)
-			cleanUpFunc := func() { cleanedUp.Store(true) }
-			ensureNotCleanedUp := func() { assert.False(t, cleanedUp.Load(), "cleanup should not have been called yet") }
-			ensureCleanedUp := func() { assert.True(t, cleanedUp.Load(), "cleanup should have been called") }
+			// cleanedUpSignal is a channel which is used to signal when the cleanup is done.
+			// If the channel is open then the cleanup is not done yet, if it's closed then the cleanup is done.
+			cleanedUpSignal := make(chan struct{})
+
+			// cleanUp is the function which performs the cleanup.
+			cleanUp := func() { close(cleanedUpSignal) }
+
+			// ensureNotCleanedUp checks whether the cleanup is done, if it's done then it fails the test.
+			ensureNotCleanedUp := func() {
+				select {
+				case <-cleanedUpSignal:
+					t.Fatal("cleanup should not have been called yet")
+				default:
+				}
+			}
+
+			// awaitCleanUp takes a timeout and waits for the given duration until the cleanup is done.
+			// If the cleanup doens't get done within the timeout duration then it fails the test.
+			awaitCleanUp := func(timeout time.Duration) {
+				select {
+				case <-cleanedUpSignal:
+				case <-time.After(timeout):
+					t.Fatal("cleanup should have been called already")
+				}
+			}
 
 			limits := &validation.Limits{ForwardingRules: validation.ForwardingRules{metric: validation.ForwardingRule{}}}
 			flagext.DefaultValues(limits)
@@ -2480,7 +2501,7 @@ func TestDistributor_ForwarderWithSlowTargets(t *testing.T) {
 			}
 
 			request := makeWriteRequest(123456789000, 5, 0, false, metric)
-			response, err := distributors[0].PushWithCleanup(ctx, request, cleanUpFunc)
+			response, err := distributors[0].PushWithCleanup(ctx, request, cleanUp)
 			assert.NoError(t, err)
 			assert.Equal(t, emptyResponse, response)
 			assert.Equal(t, 1, int(forwarder.sendCount.Load()))
@@ -2488,7 +2509,13 @@ func TestDistributor_ForwarderWithSlowTargets(t *testing.T) {
 			ingestedMetrics := getIngestedMetrics(ctx, t, &ingesters[0])
 			assert.Equal(t, []string{metric}, ingestedMetrics)
 
-			ensureCleanedUp()
+			// wait for the cleanup for the double of the longest latency.
+			awaitCleanUp(2 * func() time.Duration {
+				if tc.forwardingLatency > tc.ingesterPushLatency {
+					return tc.forwardingLatency
+				}
+				return tc.ingesterPushLatency
+			}())
 		})
 	}
 }

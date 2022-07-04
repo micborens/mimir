@@ -805,7 +805,7 @@ func (d *Distributor) PushWithCleanup(ctx context.Context, req *mimirpb.WriteReq
 		// request is done to prevent that samples get returned to the pool while the forwarding is still in progress.
 		originalCleanup := cleanup
 		cleanup = func() {
-			forwardingPromise.AwaitDone()
+			forwardingPromise.Wait()
 			originalCleanup()
 		}
 	}
@@ -832,7 +832,7 @@ func (d *Distributor) PushWithCleanup(ctx context.Context, req *mimirpb.WriteReq
 	if len(seriesKeys) == 0 && len(metadataKeys) == 0 {
 		if forwardingPromise != nil {
 			// Blocks until the forwarding requests have completed and the final status has been pushed through this chan.
-			err = httpgrpcutil.PrioritizeRecoverableErr([]error{err, firstPartialErr, forwardingPromise.Error()}...)
+			err = httpgrpcutil.PrioritizeRecoverableErr([]error{err, firstPartialErr, forwardingPromise.ErrorAsHttpGrpc()}...)
 			if err != nil {
 				return nil, err
 			}
@@ -891,7 +891,7 @@ func (d *Distributor) PushWithCleanup(ctx context.Context, req *mimirpb.WriteReq
 
 	if forwardingPromise != nil {
 		// Blocks until the forwarding requests have completed and the final status has been pushed through this chan.
-		err = httpgrpcutil.PrioritizeRecoverableErr([]error{err, firstPartialErr, forwardingPromise.Error()}...)
+		err = httpgrpcutil.PrioritizeRecoverableErr([]error{err, firstPartialErr, forwardingPromise.ErrorAsHttpGrpc()}...)
 	}
 
 	if err != nil {

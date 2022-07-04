@@ -801,7 +801,7 @@ func (d *Distributor) PushWithCleanup(ctx context.Context, req *mimirpb.WriteReq
 	if forwardingReq != nil {
 		forwardingPromise = forwardingReq.Send(ctx)
 
-		// If some samples get forwarded via a forwarding request, we need to delay the cleanup until the forwarding
+		// If some samples get forwarded via a forwarding request we need to delay the cleanup until the forwarding
 		// request is done to prevent that samples get returned to the pool while the forwarding is still in progress.
 		originalCleanup := cleanup
 		cleanup = func() {

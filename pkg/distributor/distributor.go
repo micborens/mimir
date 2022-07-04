@@ -797,9 +797,17 @@ func (d *Distributor) PushWithCleanup(ctx context.Context, req *mimirpb.WriteReq
 		validatedExemplars += len(ts.Exemplars)
 	}
 
-	var forwardingErrCh <-chan error
+	var forwardingPromise *forwarding.Promise
 	if forwardingReq != nil {
-		forwardingErrCh = forwardingReq.Send(ctx)
+		forwardingPromise = forwardingReq.Send(ctx)
+
+		// If some samples get forwarded via a forwarding request, we need to delay the cleanup until the forwarding
+		// request is done to prevent that samples get returned to the pool while the forwarding is still in progress.
+		originalCleanup := cleanup
+		cleanup = func() {
+			forwardingPromise.AwaitDone()
+			originalCleanup()
+		}
 	}
 
 	for _, m := range req.Metadata {
@@ -822,9 +830,9 @@ func (d *Distributor) PushWithCleanup(ctx context.Context, req *mimirpb.WriteReq
 	d.receivedMetadata.WithLabelValues(userID).Add(float64(len(validatedMetadata)))
 
 	if len(seriesKeys) == 0 && len(metadataKeys) == 0 {
-		if forwardingErrCh != nil {
+		if forwardingPromise != nil {
 			// Blocks until the forwarding requests have completed and the final status has been pushed through this chan.
-			err = httpgrpcutil.PrioritizeRecoverableErr(err, <-forwardingErrCh, firstPartialErr)
+			err = httpgrpcutil.PrioritizeRecoverableErr([]error{err, firstPartialErr, forwardingPromise.Error()}...)
 			if err != nil {
 				return nil, err
 			}
@@ -881,10 +889,9 @@ func (d *Distributor) PushWithCleanup(ctx context.Context, req *mimirpb.WriteReq
 		return d.send(localCtx, ingester, timeseries, metadata, req.Source)
 	}, func() { cleanup(); cancel() })
 
-	if forwardingErrCh != nil {
+	if forwardingPromise != nil {
 		// Blocks until the forwarding requests have completed and the final status has been pushed through this chan.
-		forwardingErr := <-forwardingErrCh
-		err = httpgrpcutil.PrioritizeRecoverableErr(err, forwardingErr, firstPartialErr)
+		err = httpgrpcutil.PrioritizeRecoverableErr([]error{err, firstPartialErr, forwardingPromise.Error()}...)
 	}
 
 	if err != nil {

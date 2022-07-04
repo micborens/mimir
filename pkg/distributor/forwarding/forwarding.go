@@ -19,6 +19,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/weaveworks/common/httpgrpc"
+	"go.uber.org/atomic"
 
 	"github.com/grafana/mimir/pkg/mimirpb"
 	"github.com/grafana/mimir/pkg/util/extract"
@@ -44,7 +45,8 @@ type Request interface {
 	// Send sends the timeseries which have been added to this forwarding request to the according endpoints.
 	// All errors returned via the returned error chan are http grpc errors.
 	// Send should only be called once, after it has been called this forwardingRequest must not be used anymore.
-	Send(ctx context.Context) <-chan error
+	// On completion of the forwarding request the returned chan gets closed.
+	Send(ctx context.Context) *Promise
 }
 
 // pools is the collection of pools which the forwarding uses when building remote_write requests.
@@ -176,20 +178,63 @@ type recoverableError struct {
 	error
 }
 
-func (r *request) Send(ctx context.Context) <-chan error {
-	errCh := make(chan error, 1)
+// Promise is used to asynchronously communicate the status and results of a forwarding request.
+type Promise struct {
+	timeout         time.Duration
+	propagateErrors bool
+	doneCh          chan struct{}
+	err             atomic.Error
+}
+
+func NewPromise(timeout time.Duration, propagateErrors bool) *Promise {
+	return &Promise{
+		propagateErrors: propagateErrors,
+		timeout:         timeout,
+		doneCh:          make(chan struct{}),
+	}
+}
+
+func (s *Promise) AwaitDone() {
+	// awaitTimeout limits for how long AwaitDone can block at twice the forwarding request timeout,
+	// this should never be reached because the forwarding requests get canceled after once the timeout.
+	awaitTimeout := time.NewTimer(2 * s.timeout)
+
+	select {
+	case <-s.doneCh:
+		awaitTimeout.Stop()
+	case <-awaitTimeout.C:
+		s.err.Store(errors.New("Timed out while waiting for forwarding request(s)."))
+	}
+}
+
+// Errors waits until the promise is done and then returns all the collected errors.
+func (s *Promise) Error() error {
+	s.AwaitDone()
+
+	return s.err.Load()
+}
+
+// Done marks the promise as Done.
+func (s *Promise) Done() {
+	close(s.doneCh)
+}
+
+// setError adds an error to the promise, must not be called after a call to .done().
+func (s *Promise) setError(err error) {
+	if !s.propagateErrors {
+		return
+	}
+
+	s.err.Store(err)
+}
+
+func (r *request) Send(ctx context.Context) *Promise {
+	promise := NewPromise(r.timeout, r.propagateErrors)
 
 	// Early return if there's no data to send.
 	if len(r.tsByEndpoint) == 0 {
-		close(errCh)
-		return errCh
-	}
-
-	returnErr := func(err error) {
-		if !r.propagateErrors {
-			return
-		}
-		errCh <- err
+		promise.Done()
+		return promise
 	}
 
 	var wg sync.WaitGroup
@@ -202,15 +247,18 @@ func (r *request) Send(ctx context.Context) <-chan error {
 		go func(endpoint string, ts []mimirpb.PreallocTimeseries) {
 			defer wg.Done()
 
+			err := r.sendToEndpoint(ctx, endpoint, ts)
+
 			errorsMtx.Lock()
 			defer errorsMtx.Unlock()
-			errorsByEndpoint[endpoint] = r.sendToEndpoint(ctx, endpoint, ts)
+
+			errorsByEndpoint[endpoint] = err
 		}(endpoint, *ts)
 	}
 
 	go func() {
 		defer r.cleanup()
-		defer close(errCh)
+		defer promise.Done()
 
 		wg.Wait()
 
@@ -223,7 +271,7 @@ func (r *request) Send(ctx context.Context) <-chan error {
 
 			if errors.As(err, &recoverableError{}) {
 				// If there is at least one recoverable error we want to return the recoverable error.
-				returnErr(httpgrpc.Errorf(http.StatusInternalServerError, "endpoint %s: %s", endpoint, err.Error()))
+				promise.setError(httpgrpc.Errorf(http.StatusInternalServerError, "endpoint %s: %s", endpoint, err.Error()))
 				return
 			}
 
@@ -231,11 +279,11 @@ func (r *request) Send(ctx context.Context) <-chan error {
 		}
 
 		if nonRecoverable != nil {
-			returnErr(nonRecoverable)
+			promise.setError(nonRecoverable)
 		}
 	}()
 
-	return errCh
+	return promise
 }
 
 // sendToEndpoint sends the given timeseries to the given endpoint.
